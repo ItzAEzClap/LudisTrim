@@ -35,7 +35,6 @@ MACRO_RULES = _compile_rules({
     "<home>/.config": "<xdgConfig>"
 })
 
-print(ENV_RULES)
 
 class TAGS(IntFlag):
     SAVE = 1 << 0
