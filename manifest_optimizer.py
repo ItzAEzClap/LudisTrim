@@ -2,13 +2,40 @@ from manifest_manager import YAML_PATH, JSON_PATH
 from enum import IntFlag
 import json
 import time
-import yaml
+import re 
 
 try:
     from yaml import CSafeLoader as SafeLoader
 except ImportError:
     from yaml import SafeLoader
 import yaml
+
+def _compile_rules(rule_dict):
+    return {re.compile(re.escape(k), re.IGNORECASE): v for k, v in rule_dict.items()}
+
+ENV_RULES = _compile_rules({
+    "$user": "<home>",
+    "$home": "<home>",
+    "$xdg_data_home": "<xdgData>",
+    "$xdg_config_home": "<xdgConfig>",
+    "<home>/deck/": "<home>/",
+})
+
+MACRO_RULES = _compile_rules({
+    "/data/library/application support": "/<xdgData>",
+    "/data/library/preferences": "/<xdgConfig>",
+    "<home>/library/application support": "<xdgData>",
+    "<home>/library/preferences": "<xdgConfig>",
+    "<home>/.steam/steam": "<root>",
+    "<home>/appdata/locallow": "<winLocalAppDataLow>",
+    "<home>/appdata/local": "<winLocalAppData>",
+    "<home>/appdata/roaming": "<winAppData>",
+    "<home>/documents": "<winDocuments>",
+    "<home>/.local/share": "<xdgData>",
+    "<home>/.config": "<xdgConfig>"
+})
+
+print(ENV_RULES)
 
 class TAGS(IntFlag):
     SAVE = 1 << 0
@@ -19,51 +46,9 @@ class TAGS(IntFlag):
 
     ANY_OS = WINDOWS | LINUX | MAC
 
-def optimize_manifest():
-    raw_yaml = get_raw_yaml()
-    processed_manifest = {}
-
-    total_games = 0
-    valid_games = 0
-    for game_name, game_data in raw_yaml.items():
-        total_games += 1
-
-        entry = {}
-
-        if files := extract_files(game_data, game_name):
-            entry["files"] = files
-        
-        if registry := extract_registry(game_data):
-            entry["registry"] = registry
-    
-        if not entry:
-            continue
-
-        install_dir = extract_install_dir(game_data)
-
-        if install_dir and install_dir != game_name:
-            entry["installDir"] = install_dir
-
-        if ids := extract_game_ids(game_data):
-            entry["ids"] = ids
-
-        valid_games += 1
-        processed_manifest[game_name] = entry
-
-    print(f"Processed {total_games} number of games")
-    print(f"Found {valid_games} number of valid games")
-
-    try:
-        with open(JSON_PATH, "w", encoding="utf-8") as tf:
-            #json.dump(processed_manifest, tf, separators=(',', ':'))
-            json.dump(processed_manifest, tf, indent=2)
-    except OSError as e:
-        print(f"Failed to save optimized code to {JSON_PATH}: {e}")
-
-    print_size_reduction()
 
 
-def extract_files(game_data, name):
+def extract_files(game_data):
     parsed_files = {}
 
     for file_path, file_info in game_data.get("files", {}).items():
@@ -107,65 +92,12 @@ def extract_files(game_data, name):
 
     return parsed_files
 
-def sanitize_file_path(raw_path):
-    normalized_slashes = raw_path.replace("\\", "/").replace("//", "/")
-    
-    env_rules = {
-        "$user": "<home>",
-        "$home": "<home>",
-        "$xdg_data_home": "<xdgData>",
-        "$xdg_config_home": "<xdgConfig>",
-        "<home>/deck/": "<home>/",
-        }
-
-    return replace_case_insensitive(normalized_slashes, env_rules)
-
-def abstract_file_path(clean_path):
-    macro_rules = {
-        "/data/library/application support": "/<xdgData>",
-        "/data/library/preferences": "/<xdgConfig>",
-        "<home>/library/application support": "<xdgData>",
-        "<home>/library/preferences": "<xdgConfig>",
-
-        "<home>/.steam/steam": "<root>",
-
-        "<home>/appdata/locallow": "<winLocalAppDataLow>",
-        "<home>/appdata/local": "<winLocalAppData>",
-        "<home>/appdata/roaming": "<winAppData>",
-        "<home>/documents": "<winDocuments>",
-
-        "<home>/.local/share": "<xdgData>",
-        "<home>/.config": "<xdgConfig>"
-    }
-
-    return replace_case_insensitive(clean_path, macro_rules)
-
-def replace_case_insensitive(file_path, rule_map):
-    for search_key, replacement in rule_map.items():
-        while True:
-            lower_path = file_path.lower()
-            idx = lower_path.find(search_key)
-
-            if idx == -1:
-                break
-
-            start = idx
-            end = idx + len(search_key)
-            file_path = file_path[:start] + replacement + file_path[end:]
-    
-    return file_path
-
-
-def extract_install_dir(game_data):
-    if install := game_data.get("installDir"):
-        return next(iter(install.keys()))
-    return None
 
 def extract_registry(game_data):
     parsed_registry = {}
 
     for reg_path, reg_info in game_data.get("registry", {}).items():
-        if reg_info:
+        if not reg_info:
             parsed_registry[reg_path] = 0
             continue
 
@@ -178,6 +110,13 @@ def extract_registry(game_data):
 
     return parsed_registry
 
+
+def extract_install_dir(game_data):
+    if install := game_data.get("installDir"):
+        return next(iter(install.keys()))
+    return None
+
+
 def extract_game_ids(game_data):
     ids = {}
     id_block = game_data.get("id", {})
@@ -186,10 +125,10 @@ def extract_game_ids(game_data):
         launcher_ids = []
 
         if launcher_id := game_data.get(launcher, {}).get("id"):
-            launcher_ids.append(str(launcher_id))
+            launcher_ids.append(int(launcher_id))
 
         # Optimized list comprehension for faster `.extend()` performance
-        launcher_ids.extend([str(i) for i in id_block.get(f"{launcher}Extra", [])])
+        launcher_ids.extend([int(i) for i in id_block.get(f"{launcher}Extra", [])])
 
         if launcher_ids:
             ids[launcher] = launcher_ids
@@ -198,6 +137,74 @@ def extract_game_ids(game_data):
         ids["lutris"] = str(lutris)
 
     return ids
+
+
+def sanitize_file_path(raw_path):
+    normalized = raw_path.replace("\\", "/").replace("//", "/")
+    clean_path = replace_case_insensitive(normalized, ENV_RULES)
+        
+    return clean_path
+
+
+def abstract_file_path(clean_path):
+    return replace_case_insensitive(clean_path, MACRO_RULES)
+
+
+def replace_case_insensitive(file_path, compiled_rules):
+    for pattern, replacement in compiled_rules.items():
+        file_path = pattern.sub(replacement, file_path)
+
+    return file_path
+
+
+# ==========================================
+# MAIN EXECUTION
+# ==========================================
+
+
+def optimize_manifest():
+    raw_yaml = get_raw_yaml()
+    processed_manifest = {}
+
+    total_games = 0
+    valid_games = 0
+    for game_name, game_data in raw_yaml.items():
+        total_games += 1
+
+        entry = {}
+
+        if files := extract_files(game_data):
+            entry["files"] = files
+        
+        if registry := extract_registry(game_data):
+            entry["registry"] = registry
+    
+        if not entry:
+            continue
+
+        install_dir = extract_install_dir(game_data)
+
+        if install_dir and install_dir != game_name:
+            entry["installDir"] = install_dir
+
+        if ids := extract_game_ids(game_data):
+            entry["ids"] = ids
+
+        valid_games += 1
+        processed_manifest[game_name] = entry
+
+    print(f"Processed {total_games} number of games")
+    print(f"Found {valid_games} number of valid games")
+
+    try:
+        with open(JSON_PATH, "w", encoding="utf-8") as tf:
+            json.dump(processed_manifest, tf, separators=(',', ':'))
+            #json.dump(processed_manifest, tf, indent=2)
+    except OSError as e:
+        print(f"Failed to save optimized code to {JSON_PATH}: {e}")
+
+    print_size_reduction()
+
 
 def get_raw_yaml():
     if not YAML_PATH.exists():
@@ -213,6 +220,7 @@ def get_raw_yaml():
 
     print(f"Loading the manifest.yaml file took {(end - start):.2f} seconds")
     return raw_yaml
+
 
 def print_size_reduction():
     if not YAML_PATH.exists() or not JSON_PATH.exists():
