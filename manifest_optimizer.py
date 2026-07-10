@@ -82,7 +82,7 @@ def extract_files(game_data):
             flags |= TAGS.WINDOWS
 
         elif path_lower.startswith(("<xdgdata>", "<xdgconfig>")):
-            flags |= TAGS.LINUX | TAGS.MAC
+            flags |= TAGS.LINUX
 
         if not (flags & TAGS.ANY_OS):
             flags |= TAGS.ANY_OS
