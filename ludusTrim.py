@@ -4,10 +4,9 @@ from manifest_optimizer import optimize_manifest
 
 def main():
     if not update_manifest():
-        pass
+        return
     
     optimize_manifest()
-
 
 
 if __name__ == "__main__":
