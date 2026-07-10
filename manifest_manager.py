@@ -34,7 +34,7 @@ def update_manifest(timeout=10) -> bool:
     except urllib.error.HTTPError as e:
         if e.code == 304:
             print("Manifest is already up to date.")
-            return False  # <-- FALSE: No new data to optimize!
+            return False
         logging.error(f"Network verification failed: HTTP {e.code}")
         return False
     except Exception as e:
