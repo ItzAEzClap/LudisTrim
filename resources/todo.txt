@@ -1,0 +1,102 @@
+Create a script that after filtering: Finds the invalid expand paths when parsing
+
+<root>: Launcher dir
+<game>: Game dir
+<base>: <root>/<game>
+
+
+Steam: <root>/userdata (Always C:/Program Files (x86)/userdata), <root>/steamapps, <root>/compatdata
+Ubisoft: <root>/savegames/<storeUserId>/RANDOM NUMBER
+
+
+========================================================================
+1. SYSTEM & CROSS-PLATFORM ENVIRONMENT MACROS
+========================================================================
+
+<home>
+Description: Base user profile path.
+Steam:       /home/deck  (or /home/username)
+Lutris:      /home/deck  (or /home/username)
+Mac:         /Users/Username
+Windows:     C:\Users\Username
+
+<winAppData>
+Description: Roaming application data directory.
+Steam:       <home>/.steam/steam/steamapps/compatdata/<appId>/pfx/drive_c/users/steamuser/AppData/Roaming
+Lutris:      <home>/Games/<game-slug>/drive_c/users/<username>/AppData/Roaming  (Or custom prefix path)
+Mac:         /Users/Username/Library/Application Support
+Windows:     C:\Users\Username\AppData\Roaming
+
+<winLocalAppData>
+Description: Local application data directory.
+Steam:       <home>/.steam/steam/steamapps/compatdata/<appId>/pfx/drive_c/users/steamuser/AppData/Local
+Lutris:      <home>/Games/<game-slug>/drive_c/users/<username>/AppData/Local
+Mac:         /Users/Username/Library/Application Support
+Windows:     C:\Users\Username\AppData\Local
+
+<winLocalAppDataLow>
+Description: Low-integrity/sandboxed data directory (popular for Unity games).
+Steam:       <home>/.steam/steam/steamapps/compatdata/<appId>/pfx/drive_c/users/steamuser/AppData/LocalLow
+Lutris:      <home>/Games/<game-slug>/drive_c/users/<username>/AppData/LocalLow
+Mac:         /Users/Username/Library/Application Support
+Windows:     C:\Users\Username\AppData\LocalLow
+
+<winDocuments>
+Description: Standard personal documents storage folder.
+Steam:       <home>/.steam/steam/steamapps/compatdata/<appId>/pfx/drive_c/users/steamuser/Documents
+Lutris:      <home>/Games/<game-slug>/drive_c/users/<username>/Documents
+Mac:         /Users/Username/Documents
+Windows:     C:\Users\Username\Documents
+
+<winPublic>
+Description: Shared public profile directory.
+Steam:       <home>/.steam/steam/steamapps/compatdata/<appId>/pfx/drive_c/users/Public
+Lutris:      <home>/Games/<game-slug>/drive_c/users/Public
+Mac:         /Users/Shared
+Windows:     C:\Users\Public
+
+<winProgramData>
+Description: System-wide application data directory.
+Steam:       <home>/.steam/steam/steamapps/compatdata/<appId>/pfx/drive_c/ProgramData
+Lutris:      <home>/Games/<game-slug>/drive_c/ProgramData
+Mac:         /Library/Application Support
+Windows:     C:\ProgramData
+
+<xdgConfig>
+Description: Linux standard configuration directory.
+Steam:       <home>/.config
+Lutris:      <home>/.config  (Lutris configuration files reside at <home>/.config/lutris)
+Mac:         /Users/Username/Library/Preferences
+Windows:     C:\Users\Username\AppData\Roaming
+
+<xdgData>
+Description: Linux standard data application directory.
+Steam:       <home>/.local/share
+Lutris:      <home>/.local/share  (Lutris engines/runners reside at <home>/.local/share/lutris)
+Mac:         /Users/Username/Library/Application Support
+Windows:     C:\Users\Username\AppData\Local
+
+========================================================================
+2. LAUNCHER & STORE-SPECIFIC MACROS
+========================================================================
+
+<base>
+Description: The specific folder where the game's running executable (.exe or binary) lives.
+Steam:       <root>/steamapps/common/<game>
+Lutris:      <home>/Games/<game-slug>/drive_c/Program Files (x86)/<GameFolder>  (Or custom game mount folder)
+Mac:         /Applications/<Game>.app/Contents/Resources
+Windows:     C:\Program Files (x86)\Steam\steamapps\common\<game>
+
+<root>
+Description: The top-level root path of the store or system drive where the game is installed.
+Steam:       <home>/.steam/steam
+Lutris:      <home>/Games  (Default installation container for all Lutris managed prefixes)
+Mac:         /Users/Username/Library/Application Support/Steam
+Windows:     C:\Program Files (x86)\Steam
+
+<game>
+Description: The name of the game's specific folder inside the installation root.
+Steam:       Dynamic folder name from appmanifest_<appId>.acf (e.g., "Half-Life 2")
+Lutris:      The structural identifier or directory label created by the installer script (e.g., "sid-meiers-civilization-iv")
+Mac:         Dynamic string matching the specific bundle layout name
+Windows:     Dynamic string identifying the exact folder name inside the store tree
