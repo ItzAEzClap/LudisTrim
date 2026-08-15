@@ -191,7 +191,7 @@ def optimize_manifest():
         if registry := extract_registry(game_data):
             entry["registry"] = registry
 
-        if cloud := game_data.get("cloud", {}):
+        if cloud := [k for k, v in game_data.get("cloud", {}).items()]:
             entry["cloud"] = cloud
 
         if not entry:
