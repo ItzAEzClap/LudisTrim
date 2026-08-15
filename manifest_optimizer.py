@@ -2,7 +2,7 @@ from manifest_manager import YAML_PATH, JSON_PATH
 from enum import IntFlag
 import json
 import time
-import re 
+import re
 
 try:
     from yaml import CSafeLoader as SafeLoader
@@ -11,26 +11,32 @@ except ImportError:
 import yaml
 
 def _compile_rules(rule_dict):
-    return {re.compile(re.escape(k), re.IGNORECASE): v for k, v in rule_dict.items()}
+    sorted_keys = sorted(rule_dict.keys(), key=len, reverse=True)
+    return {re.compile(re.escape(k), re.IGNORECASE): rule_dict[k] for k in sorted_keys}
 
 ENV_RULES = _compile_rules({
+    # Literal misspellings
     "$user": "<home>",
     "$home": "<home>",
     "$xdg_data_home": "<xdgData>",
     "$xdg_config_home": "<xdgConfig>",
+
+    # Wrong format
+    "<home>/application support": "<home>/library/application support",
+    "<home>/preferences": "<home>/library/preferences",
+    "<home>/.steam/steam": "<root>",
     "<home>/deck/": "<home>/",
 })
 
 MACRO_RULES = _compile_rules({
-    "/data/library/application support": "/<xdgData>",
-    "/data/library/preferences": "/<xdgConfig>",
-    "<home>/library/application support": "<xdgData>",
-    "<home>/library/preferences": "<xdgConfig>",
-    "<home>/.steam/steam": "<root>",
+    "<home>/library/application support": "<macAppSupport>",
+    "<home>/library/preferences": "<macPreferences>",
+
     "<home>/appdata/locallow": "<winLocalAppDataLow>",
     "<home>/appdata/local": "<winLocalAppData>",
     "<home>/appdata/roaming": "<winAppData>",
     "<home>/documents": "<winDocuments>",
+
     "<home>/.local/share": "<xdgData>",
     "<home>/.config": "<xdgConfig>"
 })
@@ -64,15 +70,13 @@ def extract_files(game_data):
         if "save" in file_tags: flags |= TAGS.SAVE
         if "config" in file_tags: flags |= TAGS.CONFIG
 
-        
+
         if path_lower.startswith(("<base>", "<root>")):
             flags |= TAGS.ANY_OS
 
         elif path_lower.startswith("<home>"):
             if path_lower.startswith(("<home>/saved games", "<home>/games/", "<home>/my games/")):
                 flags |= TAGS.WINDOWS
-            elif path_lower.startswith(("<home>/library", "<home>/application support/")):
-                flags |= TAGS.MAC
             elif path_lower.startswith(("<home>/.", "<home>/config.unity3d/")):
                 flags |= TAGS.LINUX
             else:
@@ -84,9 +88,12 @@ def extract_files(game_data):
         elif path_lower.startswith(("<xdgdata>", "<xdgconfig>")):
             flags |= TAGS.LINUX
 
+        elif path_lower.startswith("<mac"):
+            flags |= TAGS.MAC
+
         if not (flags & TAGS.ANY_OS):
             flags |= TAGS.ANY_OS
-        
+
         parsed_files[fixed_path] = flags
 
     return parsed_files
@@ -124,14 +131,20 @@ def extract_game_ids(game_data):
         launcher_ids = []
 
         if launcher_id := game_data.get(launcher, {}).get("id"):
-            launcher_ids.append(int(launcher_id))
+            try:
+                launcher_ids.append(int(launcher_id))
+            except (ValueError, TypeError):
+                pass
 
-        # Optimized list comprehension for faster `.extend()` performance
-        launcher_ids.extend([int(i) for i in id_block.get(f"{launcher}Extra", [])])
+        for i in id_block.get(f"{launcher}Extra", []):
+            try:
+                launcher_ids.append(int(i))
+            except (ValueError, TypeError):
+                pass
 
         if launcher_ids:
             ids[launcher] = launcher_ids
-    
+
     if lutris := id_block.get("lutris"):
         ids["lutris"] = str(lutris)
 
@@ -139,9 +152,9 @@ def extract_game_ids(game_data):
 
 
 def sanitize_file_path(raw_path):
-    normalized = raw_path.replace("\\", "/").replace("//", "/")
+    normalized = re.sub(r'/{2,}', '/', raw_path.replace("\\", "/"))
     clean_path = replace_case_insensitive(normalized, ENV_RULES)
-        
+
     return clean_path
 
 
@@ -174,10 +187,13 @@ def optimize_manifest():
 
         if files := extract_files(game_data):
             entry["files"] = files
-        
+
         if registry := extract_registry(game_data):
             entry["registry"] = registry
-    
+
+        if cloud := game_data.get("cloud", {}):
+            entry["cloud"] = cloud
+
         if not entry:
             continue
 
@@ -192,8 +208,8 @@ def optimize_manifest():
         valid_games += 1
         processed_manifest[game_name] = entry
 
-    print(f"Processed {total_games} number of games")
-    print(f"Found {valid_games} number of valid games")
+    print(f"Processed {total_games:,} games")
+    print(f"Found {valid_games:,} games with save data")
 
     try:
         with open(JSON_PATH, "w", encoding="utf-8") as tf:
@@ -224,7 +240,7 @@ def get_raw_yaml():
 def print_size_reduction():
     if not YAML_PATH.exists() or not JSON_PATH.exists():
         return
-    
+
     yaml_size = YAML_PATH.stat().st_size / 1024
     json_size = JSON_PATH.stat().st_size / 1024
     reduction = ((yaml_size - json_size) / yaml_size) * 100
