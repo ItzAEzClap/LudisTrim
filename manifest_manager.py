@@ -16,7 +16,7 @@ def get_cached_etag() -> str:
     if ETAG_PATH.exists():
         try:
             return ETAG_PATH.read_text(encoding="utf-8").strip()
-        except OSError:
+        except OSError as e:
             logging.warning(f"Could not read cached ETag: {e}")
     return ""
 
