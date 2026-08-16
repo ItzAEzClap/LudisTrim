@@ -125,27 +125,15 @@ def extract_install_dir(game_data):
 
 def extract_game_ids(game_data):
     ids = {}
-    id_block = game_data.get("id", {})
 
     for launcher in ("steam", "gog"):
-        launcher_ids = []
-
-        if launcher_id := game_data.get(launcher, {}).get("id"):
+        if raw_id := game_data.get(launcher, {}).get("id"):
             try:
-                launcher_ids.append(int(launcher_id))
+                ids[launcher] = int(raw_id)
             except (ValueError, TypeError):
                 pass
 
-        for i in id_block.get(f"{launcher}Extra", []):
-            try:
-                launcher_ids.append(int(i))
-            except (ValueError, TypeError):
-                pass
-
-        if launcher_ids:
-            ids[launcher] = launcher_ids
-
-    if lutris := id_block.get("lutris"):
+    if lutris := game_data.get("id", {}).get("lutris"):
         ids["lutris"] = str(lutris)
 
     return ids
