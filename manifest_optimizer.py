@@ -127,9 +127,9 @@ def extract_game_ids(game_data):
     ids = {}
 
     for launcher in ("steam", "gog"):
-        if raw_id := game_data.get(launcher, {}).get("id"):
+        if base_id := game_data.get(launcher, {}).get("id"):
             try:
-                ids[launcher] = int(raw_id)
+                ids[launcher] = int(base_id)
             except (ValueError, TypeError):
                 pass
 
